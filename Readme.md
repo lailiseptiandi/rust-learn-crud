@@ -37,7 +37,7 @@ Run command for starting project :
 #### Create Users
 
 ```http
-  GET /api/v1/users
+  POST /api/v1/users
 
 ```
 
