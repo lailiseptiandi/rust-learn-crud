@@ -31,12 +31,14 @@ Run command for starting project :
 
 ```http
   GET /api/v1/users
+
 ```
 
 #### Create Users
 
 ```http
   GET /api/v1/users
+
 ```
 
 | Body       | Type     | Description       |
