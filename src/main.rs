@@ -1,5 +1,9 @@
-use actix_web::{web, App, HttpResponse, HttpServer};
-use mysql::{prelude::Queryable, Pool};
+use actix_web::{web, App, HttpServer};
+use app::database::database_connection;
+
+use crate::handlers::user_handler::{create_user, get_users};
+use crate::repository::user_repository::UserRepository;
+use crate::services::user_service::UserService;
 
 mod models {
     pub mod user;
@@ -13,64 +17,27 @@ mod utils {
     pub mod helper;
 }
 
-use app::database::database_connection;
-use models::user::User;
-use models::user::UserResponse;
-use utils::helper::json_response;
-extern crate bcrypt;
-use bcrypt::{hash, DEFAULT_COST};
-
-async fn get_users() -> HttpResponse {
-    let pool = database_connection();
-    let mut conn = pool.get_conn().unwrap();
-
-    let users: Vec<User> = conn
-        .query_map(
-            "SELECT id, name, email, password FROM users",
-            |(id, name, email, password)| User {
-                id,
-                name,
-                email,
-                password,
-            },
-        )
-        .unwrap();
-
-    let users_response: Vec<UserResponse> = users
-        .into_iter()
-        .map(|user| UserResponse {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-        })
-        .collect();
-
-    json_response(
-        "success",
-        200,
-        "Successfully get users",
-        Some(users_response),
-    )
+mod repository {
+    pub mod user_repository;
 }
 
-async fn create_user(user: web::Json<User>) -> HttpResponse {
-    let pool = database_connection();
-    let mut conn = pool.get_conn().unwrap();
-    let password = user.password.clone().unwrap_or_else(|| "".to_string());
-    let pass_hash = hash(password, DEFAULT_COST).unwrap();
-    conn.exec_drop(
-        "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-        (user.name.clone(), user.email.clone(), pass_hash),
-    )
-    .unwrap();
+mod handlers {
+    pub mod user_handler;
+}
 
-    json_response("success", 201, "created user successfully", None::<User>)
+mod services {
+    pub mod user_service;
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    let pool = database_connection();
+
+    HttpServer::new(move || {
+        let repo = UserRepository::new(pool.clone());
+        let u_service = UserService::new(repo);
         let api_group = web::scope("/api/v1")
+            .app_data(web::Data::new(u_service))
             .route("/users", web::get().to(get_users))
             .route("/users", web::post().to(create_user));
 
